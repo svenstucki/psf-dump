@@ -1,0 +1,6 @@
+# vim swap files
+*.swp
+
+# object files and executeable
+*.o
+psf-dump
