@@ -127,7 +127,6 @@ int psf_read(struct psf_file *psf) {
   }
 
   psf->num_tags = 0;
-  psf->tag_size = 0;
   psf->tags = NULL;
 
   // read and check tag magic
@@ -176,6 +175,8 @@ int psf_read(struct psf_file *psf) {
       free(key);
       return -8;
     }
+
+    // TODO: Hadle multi-line tags
 
     // allocate new tag struct
     tag = malloc(sizeof (struct psf_tag));

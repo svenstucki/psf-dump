@@ -10,6 +10,8 @@ void usage(const char *argv[]) {
 
 
 void print_psf(const char *fn, const struct psf_file *f) {
+  int i;
+
   printf("PSF information (for '%s'):\n", fn);
   printf("\n");
   printf("Version: %s (0x%02x)\n", psf_version_string(f->version), f->version);
@@ -17,6 +19,17 @@ void print_psf(const char *fn, const struct psf_file *f) {
          "           Compressed:    %4u Byte\n"
          "           Uncompressed:  %4u Byte\n", f->reserved_size, f->compressed_size, f->data_size);
   printf("Number of tags: %d\n", f->num_tags);
+  printf("\n");
+
+  // print tags
+  if (f->num_tags) {
+    printf("Tags:\n");
+
+    for (i = 0; i < f->num_tags; i++) {
+      struct psf_tag *tag = f->tags[i];
+      printf("  %8s = %s\n", tag->key, tag->value);
+    }
+  }
 }
 
 
