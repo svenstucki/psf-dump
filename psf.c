@@ -95,34 +95,35 @@ int psf_read(struct psf_file *psf) {
 
   // read header
   // this assumes that the host machine uses little-endian byte ordering
-  if (fread(&psf->version, 1, 13, psf->fd) < 13) {
+  if (fread(&psf->header, 1, sizeof psf->header, psf->fd) < sizeof psf->header) {
     return -4;
   }
 
   // read reserved area data
   psf->reserved_data = NULL;
-  if (psf->reserved_size > 0) {
-    psf->reserved_data = malloc(psf->reserved_size);
+  if (psf->header.reserved_size > 0) {
+    psf->reserved_data = malloc(psf->header.reserved_size);
     if (!psf->reserved_data) {
       return -7;
     }
-    if (fread(psf->reserved_data, 1, psf->reserved_size, psf->fd) < psf->reserved_size) {
+    if (fread(psf->reserved_data, 1, psf->header.reserved_size, psf->fd) < psf->header.reserved_size) {
       return -8;
     }
   }
 
   // read compressed data
-  if (psf->compressed_size > 0) {
-    buffer = malloc(psf->compressed_size);
+  if (psf->header.compressed_size > 0) {
+    buffer = malloc(psf->header.compressed_size);
     if (!buffer) {
       return -5;
     }
-    if (fread(buffer, 1, psf->compressed_size, psf->fd) < psf->compressed_size) {
+    if (fread(buffer, 1, psf->header.compressed_size, psf->fd) < psf->header.compressed_size) {
       free(buffer);
       return -6;
     }
 
     // TODO: Check CRC
+    // TODO: Unzip
     free(buffer);
   }
 
@@ -147,10 +148,18 @@ int psf_read(struct psf_file *psf) {
     struct psf_tag *tag;
     struct psf_tag **tags;
 
-    // find and remove line end
+    // sanitze string, find and remove line end
     end = tag_buffer;
-    while (*end != '\0' && *end != '\n')
+    while (*end != '\0' && *end != '\n') {
+      if (*end < 0x20) {
+        // replace control characters with spaces
+        *end = 0x20;
+      } else if (*end > 0x7F) {
+        // remove non-ascii bytes (note: this messes up strings in other encodings)
+        *end = 0x20;
+      }
       end++;
+    }
     *end = '\0';
 
     // find separator
@@ -163,7 +172,6 @@ int psf_read(struct psf_file *psf) {
 
     // TODO: Remove all whitespace (0x01 - 0x20)
     // TODO: Check if key is valid (valid C identifier, <0x7F)
-    //printf("Reading tag: '%s' = '%s'\n", tag_buffer, separator);
 
     // create a copy of key and value
     key = strdup(tag_buffer);

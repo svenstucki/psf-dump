@@ -12,13 +12,17 @@ struct psf_tag {
 
 
 #pragma pack(1)
-struct psf_file {
-  FILE *fd;
-  // header fields from file
+struct psf_file_header {
   uint8_t version;
   uint32_t reserved_size;
   uint32_t compressed_size;
   uint32_t compressed_crc;
+};
+
+struct psf_file {
+  FILE *fd;
+  // header fields from file
+  struct psf_file_header header;
   // reserved data area and uncompressed contents
   void *reserved_data;
   size_t data_size;
