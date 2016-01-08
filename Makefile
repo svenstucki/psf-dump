@@ -14,3 +14,6 @@ $(OUT): $(OBJS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
+
+clean:
+	rm $(OBJS) $(OUT)
