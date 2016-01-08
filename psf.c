@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 #include "psf.h"
 
 
@@ -48,29 +47,99 @@ void psf_close(struct psf_file *psf) {
   if (psf->fd) {
     fclose(psf->fd);
   }
+
+  if (psf->reserved_data) {
+    free(psf->reserved_data);
+  };
+
+  if (psf->tags) {
+    free(psf->tags);
+  }
+
+  memset(psf, 0, sizeof (struct psf_file));
 };
 
 
 int psf_read(struct psf_file *psf) {
-  char magic[3];
+  char tag_buffer[1024];
+  char magic_buffer[5];
+  char *buffer;
 
   if (!psf) {
     return -1;
   }
 
   // read magic bytes
-  if (fread(magic, 1, 3, psf->fd) < 3) {
+  if (fread(magic_buffer, 1, 3, psf->fd) < 3) {
     return -2;
   }
-  if (magic[0] != 'P' || magic[1] != 'S' || magic[2] != 'F') {
+  if (magic_buffer[0] != 'P' || magic_buffer[1] != 'S' || magic_buffer[2] != 'F') {
     // magic bytes don't match
     return -3;
   }
 
   // read header
-  // this assumes that both the host machine and the file format use little-endian byte ordering
+  // this assumes that the host machine uses little-endian byte ordering
   if (fread(&psf->version, 1, 13, psf->fd) < 13) {
     return -4;
+  }
+
+  // read reserved area data
+  if (psf->reserved_size > 0) {
+    psf->reserved_data = malloc(psf->reserved_size);
+    if (!psf->reserved_data) {
+      return -7;
+    }
+    if (fread(psf->reserved_data, 1, psf->reserved_size, psf->fd) < psf->reserved_size) {
+      return -8;
+    }
+  }
+
+  // read compressed data
+  if (psf->compressed_size > 0) {
+    buffer = malloc(psf->compressed_size);
+    if (!buffer) {
+      return -5;
+    }
+    if (fread(buffer, 1, psf->compressed_size, psf->fd) < psf->compressed_size) {
+      free(buffer);
+      return -6;
+    }
+
+    // TODO: Check CRC
+    free(buffer);
+  }
+
+  // initialize empty tag array
+  psf->num_tags = 0;
+  psf->tag_size = 0;
+  psf->tags = malloc(sizeof (struct psf_tag **));
+  if (!psf->tags) {
+    return -7;
+  }
+  psf->tags[0] = NULL;
+
+  // read and check tag magic
+  if (fread(magic_buffer, 1, 5, psf->fd) < 5) {
+    // no tags
+    return 0;
+  }
+  if (magic_buffer[0] != '[' || magic_buffer[1] != 'T' || magic_buffer[2] != 'A'
+      || magic_buffer[3] != 'G' || magic_buffer[4] != ']') {
+    // wrong magic, no tags
+    return 0;
+  }
+
+  // read and parse tags
+  while (fgets(tag_buffer, sizeof(tag_buffer), psf->fd)) {
+    char *separator = strchr(tag_buffer, '=');
+    if (!separator) {
+      // invalid line, no '='
+      continue;
+    }
+
+    // TODO: Remove all whitespace (0x01 - 0x20)
+    // TODO: Check if key is valid (valid C identifier, <0x7F)
   }
 
   return 0;

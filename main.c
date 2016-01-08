@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 
 #include "psf.h"
@@ -12,12 +13,19 @@ void print_psf(const char *fn, const struct psf_file *f) {
   printf("PSF information (for '%s'):\n", fn);
   printf("\n");
   printf("Version: %s (0x%02x)\n", psf_version_string(f->version), f->version);
+  printf("Data Size: Reserved area: %4u Byte\n"
+         "           Compressed:    %4u Byte\n"
+         "           Uncompressed:  %4u Byte\n"
+         "           Tags:          %4u Byte (%i tags)\n"
+         , f->reserved_size, f->compressed_size, f->data_size, f->tag_size, f->num_tags);
 }
 
 
 int main(int argc, const char *argv[]) {
+  int ret = 0;
+
   const char *fn;
-  struct psf_file psf;
+  struct psf_file *psf;
 
   if (argc < 2) {
     usage(argv);
@@ -25,17 +33,24 @@ int main(int argc, const char *argv[]) {
   }
 
   fn = argv[1];
-  if (psf_open(fn, &psf) < 0) {
+
+  psf = psf_open_alloc(fn);
+  if (!psf) {
     printf("Error opening file '%s'\n", fn);
     return -2;
   }
 
-  if (psf_read(&psf) < 0) {
+  if (psf_read(psf) < 0) {
     printf("Error reading PSF contents\n");
-    return -3;
+    ret = -3;
+    goto end;
   }
 
-  print_psf(fn, &psf);
+  print_psf(fn, psf);
 
-  return 0;
+end:
+  psf_close(psf);
+  free(psf);
+  return ret;
 }
+

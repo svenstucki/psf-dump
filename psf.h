@@ -10,14 +10,23 @@ struct psf_tag {
   const char *value;
 };
 
+
 #pragma pack(1)
 struct psf_file {
   FILE *fd;
+  // header fields from file
   uint8_t version;
   uint32_t reserved_size;
   uint32_t compressed_size;
   uint32_t compressed_crc;
-  struct psf_tag *tags[];
+  // reserved data area and uncompressed contents
+  void *reserved_data;
+  size_t data_size;
+  void *data;
+  // parsed tags
+  int num_tags;
+  size_t tag_size;
+  struct psf_tag **tags;
 };
 
 
@@ -26,7 +35,7 @@ extern struct psf_file *psf_open_alloc(const char *path);
 extern int psf_open(const char *path, struct psf_file *psf);
 
 // closes openend PSF file and frees allocated resources
-extern void psf_free(struct psf_file *);
+extern void psf_close(struct psf_file *);
 
 // read PSF header, data and tags
 extern int psf_read(struct psf_file *);
