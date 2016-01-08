@@ -12,7 +12,7 @@ OUT=psf-dump
 $(OUT): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS)
 
-%.o: %.c
+%.o: %.c %.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
