@@ -15,9 +15,8 @@ void print_psf(const char *fn, const struct psf_file *f) {
   printf("Version: %s (0x%02x)\n", psf_version_string(f->version), f->version);
   printf("Data Size: Reserved area: %4u Byte\n"
          "           Compressed:    %4u Byte\n"
-         "           Uncompressed:  %4u Byte\n"
-         "           Tags:          %4u Byte (%i tags)\n"
-         , f->reserved_size, f->compressed_size, f->data_size, f->tag_size, f->num_tags);
+         "           Uncompressed:  %4u Byte\n", f->reserved_size, f->compressed_size, f->data_size);
+  printf("Number of tags: %d\n", f->num_tags);
 }
 
 

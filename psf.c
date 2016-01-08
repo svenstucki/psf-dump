@@ -52,7 +52,22 @@ void psf_close(struct psf_file *psf) {
     free(psf->reserved_data);
   };
 
+  // free tags
   if (psf->tags) {
+    int i;
+    for (i = 0; i < psf->num_tags; i++) {
+      struct psf_tag *tag = psf->tags[i];
+      if (!tag)
+        continue;
+
+      if (tag->key)
+        free(tag->key);
+      if (tag->value)
+        free(tag->value);
+
+      free(tag);
+    }
+
     free(psf->tags);
   }
 
@@ -85,6 +100,7 @@ int psf_read(struct psf_file *psf) {
   }
 
   // read reserved area data
+  psf->reserved_data = NULL;
   if (psf->reserved_size > 0) {
     psf->reserved_data = malloc(psf->reserved_size);
     if (!psf->reserved_data) {
@@ -110,14 +126,9 @@ int psf_read(struct psf_file *psf) {
     free(buffer);
   }
 
-  // initialize empty tag array
   psf->num_tags = 0;
   psf->tag_size = 0;
-  psf->tags = malloc(sizeof (struct psf_tag **));
-  if (!psf->tags) {
-    return -7;
-  }
-  psf->tags[0] = NULL;
+  psf->tags = NULL;
 
   // read and check tag magic
   if (fread(magic_buffer, 1, 5, psf->fd) < 5) {
@@ -132,14 +143,60 @@ int psf_read(struct psf_file *psf) {
 
   // read and parse tags
   while (fgets(tag_buffer, sizeof(tag_buffer), psf->fd)) {
-    char *separator = strchr(tag_buffer, '=');
+    char *separator, *end;
+    char *key, *value;
+    struct psf_tag *tag;
+    struct psf_tag **tags;
+
+    // find and remove line end
+    end = tag_buffer;
+    while (*end != '\0' && *end != '\n')
+      end++;
+    *end = '\0';
+
+    // find separator
+    separator = strchr(tag_buffer, '=');
     if (!separator) {
-      // invalid line, no '='
+      // invalid line
       continue;
     }
+    *separator++ = 0;
 
     // TODO: Remove all whitespace (0x01 - 0x20)
     // TODO: Check if key is valid (valid C identifier, <0x7F)
+    //printf("Reading tag: '%s' = '%s'\n", tag_buffer, separator);
+
+    // create a copy of key and value
+    key = strdup(tag_buffer);
+    if (!key) {
+      return -7;
+    }
+    value = strdup(separator);
+    if (!value) {
+      free(key);
+      return -8;
+    }
+
+    // allocate new tag struct
+    tag = malloc(sizeof (struct psf_tag));
+    if (!tag) {
+      free(key);
+      free(value);
+      return -9;
+    }
+    tag->key = key;
+    tag->value = value;
+
+    // grow tag array
+    tags = realloc(psf->tags, (psf->num_tags + 1) * sizeof (struct psf_tag **));
+    if (!tags) {
+      free(key);
+      free(value);
+      return -10;
+    }
+    tags[psf->num_tags] = tag;
+    psf->tags = tags;
+    psf->num_tags++;
   }
 
   return 0;

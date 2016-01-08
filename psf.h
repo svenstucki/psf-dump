@@ -6,8 +6,8 @@
 
 
 struct psf_tag {
-  const char *key;
-  const char *value;
+  char *key;
+  char *value;
 };
 
 
@@ -25,7 +25,6 @@ struct psf_file {
   void *data;
   // parsed tags
   int num_tags;
-  size_t tag_size;
   struct psf_tag **tags;
 };
 
