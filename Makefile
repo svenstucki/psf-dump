@@ -2,7 +2,7 @@ CC=gcc
 LD=gcc
 
 CFLAGS=-O3 -g -Wall
-LDFLAGS=
+LDFLAGS=-lz
 
 
 OBJS=psf.o main.o

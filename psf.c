@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <zlib.h>
+
 #include "psf.h"
 
 
@@ -52,6 +54,10 @@ void psf_close(struct psf_file *psf) {
     free(psf->reserved_data);
   };
 
+  if (psf->data) {
+    free(psf->data);
+  }
+
   // free tags
   if (psf->tags) {
     int i;
@@ -78,7 +84,10 @@ void psf_close(struct psf_file *psf) {
 int psf_read(struct psf_file *psf) {
   char tag_buffer[1024];
   char magic_buffer[5];
-  char *buffer;
+  unsigned char *buffer;
+  void *data_buffer;
+  uint32_t crc;
+  int ret;
 
   if (!psf) {
     return -1;
@@ -111,7 +120,10 @@ int psf_read(struct psf_file *psf) {
     }
   }
 
-  // read compressed data
+  psf->data_size = 0;
+  psf->data = NULL;
+
+  // read and uncompress data
   if (psf->header.compressed_size > 0) {
     buffer = malloc(psf->header.compressed_size);
     if (!buffer) {
@@ -122,9 +134,59 @@ int psf_read(struct psf_file *psf) {
       return -6;
     }
 
-    // TODO: Check CRC
-    // TODO: Unzip
+    // check CRC of compressed data with zlib
+    crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, buffer, psf->header.compressed_size);
+    if (crc != psf->header.compressed_crc) {
+      free(buffer);
+      return -11;
+    }
+
+    // uncompress data
+    do {
+      // exponentially grow output buffer until it is large enough to hold data
+      if (psf->data_size) {
+        psf->data_size = psf->data_size * 2;
+      } else {
+        // initial size is twice the compressed size rounded down to 256 byte increments
+        psf->data_size = (psf->header.compressed_size >> 8) << 9;
+        if (!psf->data_size) {
+          psf->data_size = 256;
+        }
+      }
+
+      psf->data = malloc(psf->data_size);
+      if (!psf->data) {
+        free(buffer);
+        return -12;
+      }
+
+      // uncompress data with zlib
+      ret = uncompress(psf->data, &psf->data_size, buffer, psf->header.compressed_size);
+    }  while (ret == Z_BUF_ERROR);
+
+    // release input buffer and handle zlib errors
     free(buffer);
+    if (ret != Z_OK) {
+      psf->data_size = 0;
+      free(psf->data);
+
+      if (ret == Z_MEM_ERROR) {
+        return -13;
+      } else if (ret == Z_DATA_ERROR) {
+        return -14;
+      }
+      return -15;
+    }
+
+    // shrink data buffer
+    data_buffer = realloc(psf->data, psf->data_size);
+    if (!data_buffer) {
+      psf->data_size = 0;
+      free(psf->data);
+      return -16;
+    }
+    psf->data = data_buffer;
   }
 
   psf->num_tags = 0;
