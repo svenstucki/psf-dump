@@ -15,7 +15,6 @@ struct psf_file *psf_open_alloc(const char *path) {
     return NULL;
   }
 
-  memset(psf, 0, sizeof (struct psf_file));
   if (psf_open(path, psf) < 0) {
     // error opening psf file
     free(psf);
@@ -30,6 +29,8 @@ int psf_open(const char *path, struct psf_file *psf) {
   if (!psf) {
     return -1;
   }
+
+  memset(psf, 0, sizeof (struct psf_file));
 
   psf->fd = fopen(path, "r");
   if (!psf->fd) {
