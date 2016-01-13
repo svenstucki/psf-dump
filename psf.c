@@ -88,6 +88,7 @@ int psf_read(struct psf_file *psf) {
   void *data_buffer;
   uint32_t crc;
   int ret;
+  struct psf_tag *tag;
 
   if (!psf) {
     return -1;
@@ -204,39 +205,81 @@ int psf_read(struct psf_file *psf) {
   }
 
   // read and parse tags
+  tag = NULL;
   while (fgets(tag_buffer, sizeof(tag_buffer), psf->fd)) {
     char *separator, *end;
+    char *key_start, *key_end;
     char *key, *value;
-    struct psf_tag *tag;
     struct psf_tag **tags;
 
-    // sanitze string, find and remove line end
-    end = tag_buffer;
+    // sanitze string and parse line
+    end = key_start = key_end = tag_buffer;
+    separator = NULL;
     while (*end != '\0' && *end != '\n') {
+      if (key_start == end) {
+        // advance key_start until first non-whitespace character is reached
+        if (*end <= 0x20) {
+          key_start++;
+        }
+        key_end = key_start + 1;
+      } else if (key_end == end) {
+        // advance key_end until separator or first whitespace character is reached
+        if (*end > 0x20 && *end != '=') {
+          key_end++;
+        }
+        if (*end >= 0x7F) {
+          // key contains invalid character, abort parsing
+          key_end = NULL;
+          break;
+        }
+      }
+
+      // find key/value separator
+      if (*end == '=') {
+        separator = end;
+      }
+
+      // replace control characters with spaces (\0 and \n are catched by the loop)
       if (*end < 0x20) {
-        // replace control characters with spaces
-        *end = 0x20;
-      } else if (*end > 0x7F) {
-        // remove non-ascii bytes (note: this messes up strings in other encodings)
         *end = 0x20;
       }
       end++;
     }
     *end = '\0';
 
-    // find separator
-    separator = strchr(tag_buffer, '=');
+    // check key_end
+    if (!key_end) {
+      // invalid line
+      continue;
+    }
+
+    // check for separator and split string
     if (!separator) {
       // invalid line
       continue;
     }
+
+    // split buffer into multiple strings
+    *key_end = 0;
     *separator++ = 0;
 
-    // TODO: Remove all whitespace (0x01 - 0x20)
-    // TODO: Check if key is valid (valid C identifier, <0x7F)
+    // check for and handle multi-line tag
+    if (tag && strcmp(key_start, tag->key) == 0) {
+      // grow value string to hold old value, newline character, current value and \0
+      value = realloc(tag->value, strlen(tag->value) + strlen(separator) + 2);
+      if (!value) {
+        return -17;
+      }
+      tag->value = value;
+
+      // concatenate strings
+      strcat(value, "\n");
+      strcat(value, separator);
+      continue;
+    }
 
     // create a copy of key and value
-    key = strdup(tag_buffer);
+    key = strdup(key_start);
     if (!key) {
       return -7;
     }
@@ -245,8 +288,6 @@ int psf_read(struct psf_file *psf) {
       free(key);
       return -8;
     }
-
-    // TODO: Hadle multi-line tags
 
     // allocate new tag struct
     tag = malloc(sizeof (struct psf_tag));
