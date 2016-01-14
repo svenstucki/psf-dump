@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <libgen.h>
 #include <zlib.h>
 
 #include "psf.h"
@@ -341,25 +342,24 @@ int psf_read(struct psf_file *psf) {
 
 
 static int psf_read_lib(struct psf_file *psf, int index, const char *file) {
-  char *path, *fn;
+  char *fn;
   struct psf_file *f, **libs;
 
   // get path of parent file
-  path = realpath(psf->fn, NULL);
-  if (!path) {
+  fn = malloc(strlen(psf->fn) + strlen(file) + 2);
+  if (!fn) {
     return -4;
   }
-
-  fn = realloc(path, strlen(path) + strlen(file) + 2);
-  if (!fn) {
-    free(path);
+  strcpy(fn, psf->fn);
+  if (dirname(fn) != fn) {
+    // filename of parent PSF must be invalid
+    free(fn);
     return -5;
   }
 
+  // append lib name
   strcat(fn, "/");
   strcat(fn, file);
-
-  printf("Reading %s..\n", fn);
 
   // try to open and parse file
   f = psf_open_alloc(fn);
