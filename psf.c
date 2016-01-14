@@ -95,6 +95,7 @@ void psf_close(struct psf_file *psf) {
   if (psf->libs) {
     for (i = 0; i < psf->num_libs; i++) {
       psf_close(psf->libs[i]);
+      free(psf->libs[i]);
     }
 
     free(psf->libs);
@@ -179,6 +180,10 @@ int psf_read(struct psf_file *psf) {
         }
       }
 
+      // allocate memory for decompressed data
+      if (psf->data) {
+        free(psf->data);
+      }
       psf->data = malloc(psf->data_size);
       if (!psf->data) {
         free(buffer);
