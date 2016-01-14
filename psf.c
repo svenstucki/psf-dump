@@ -32,10 +32,18 @@ int psf_open(const char *path, struct psf_file *psf) {
 
   memset(psf, 0, sizeof (struct psf_file));
 
+  // store file name
+  psf->fn = strdup(path);
+  if (!psf->fn) {
+    return -2;
+  }
+
+  // open file
   psf->fd = fopen(path, "r");
   if (!psf->fd) {
     // error opening file
-    return -2;
+    free(psf->fn);
+    return -3;
   }
 
   return 0;
@@ -43,10 +51,15 @@ int psf_open(const char *path, struct psf_file *psf) {
 
 
 void psf_close(struct psf_file *psf) {
+  int i;
+
   if (!psf) {
     return;
   }
 
+  if (psf->fn) {
+    free(psf->fn);
+  }
   if (psf->fd) {
     fclose(psf->fd);
   }
@@ -54,7 +67,6 @@ void psf_close(struct psf_file *psf) {
   if (psf->reserved_data) {
     free(psf->reserved_data);
   };
-
   if (psf->data) {
     free(psf->data);
   }
@@ -76,6 +88,15 @@ void psf_close(struct psf_file *psf) {
     }
 
     free(psf->tags);
+  }
+
+  // close and free libs
+  if (psf->libs) {
+    for (i = 0; i < psf->num_libs; i++) {
+      psf_close(psf->libs[i]);
+    }
+
+    free(psf->libs);
   }
 
   memset(psf, 0, sizeof (struct psf_file));
@@ -310,6 +331,84 @@ int psf_read(struct psf_file *psf) {
     tags[psf->num_tags] = tag;
     psf->tags = tags;
     psf->num_tags++;
+  }
+
+  psf->num_libs = 0;
+  psf->libs = NULL;
+
+  return 0;
+}
+
+
+static int psf_read_lib(struct psf_file *psf, int index, const char *file) {
+  char *path, *fn;
+  struct psf_file *f, **libs;
+
+  // get path of parent file
+  path = realpath(psf->fn, NULL);
+  if (!path) {
+    return -4;
+  }
+
+  fn = realloc(path, strlen(path) + strlen(file) + 2);
+  if (!fn) {
+    free(path);
+    return -5;
+  }
+
+  strcat(fn, "/");
+  strcat(fn, file);
+
+  printf("Reading %s..\n", fn);
+
+  // try to open and parse file
+  f = psf_open_alloc(fn);
+  free(fn);
+  if (f == NULL) {
+    return -1;
+  }
+  f->lib_index = index;
+  if (psf_read(f) < 0) {
+    psf_close(f);
+    return -2;
+  }
+
+  // grow and append to libs array of parent file
+  libs = realloc(psf->libs, (psf->num_libs + 1) * sizeof (struct psf_file **));
+  if (!libs) {
+    psf_close(f);
+    return -3;
+  }
+  libs[psf->num_libs] = f;
+  psf->libs = libs;
+  psf->num_libs++;
+  return 0;
+}
+
+
+int psf_read_libs(struct psf_file *psf) {
+  int i;
+  unsigned int index;
+  struct psf_tag *tag;
+
+  if (!psf)
+    return -1;
+  if (!psf->tags)
+    return -2;
+
+  // find tags that reference libraries
+  for (i = 0; i < psf->num_tags; i++) {
+    tag = psf->tags[i];
+    if (!tag)
+      return -3;
+
+    if (strcmp(tag->key, "_lib") == 0) {
+      if (psf_read_lib(psf, 1, tag->value) < 0)
+        return -4;
+    } else if (sscanf(tag->key, "_lib%d", &index) == 1) {
+      if (psf_read_lib(psf, index, tag->value) < 0)
+        return -5;
+    }
   }
 
   return 0;

@@ -21,6 +21,7 @@ struct psf_file_header {
 
 
 struct psf_file {
+  char *fn;
   FILE *fd;
   // header fields from file
   struct psf_file_header header;
@@ -31,6 +32,10 @@ struct psf_file {
   // parsed tags
   int num_tags;
   struct psf_tag **tags;
+  // loaded libs
+  int num_libs;
+  struct psf_file **libs;
+  int lib_index;
 };
 
 
@@ -43,6 +48,9 @@ extern void psf_close(struct psf_file *);
 
 // read PSF header, data and tags
 extern int psf_read(struct psf_file *);
+
+// read libs referenced in the PSF (mainly for mini-PSF)
+extern int psf_read_libs(struct psf_file *);
 
 
 // returns string description of PSF version byte

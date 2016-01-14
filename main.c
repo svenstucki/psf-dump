@@ -60,6 +60,12 @@ int main(int argc, const char *argv[]) {
     goto end;
   }
 
+  if (psf_read_libs(psf) < 0) {
+    printf("Error reading PSF libs\n");
+    ret = -4;
+    goto end;
+  }
+
   print_psf(fn, psf);
 
 end:
