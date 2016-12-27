@@ -1,4 +1,4 @@
-# PSF Information Dump
+# PSF Information Tool
 
 This is a small command-line utility that parses and displays the header of a
 [PSF file](https://en.wikipedia.org/wiki/Portable_Sound_Format), i.e. game
